@@ -223,6 +223,45 @@ yarn run lint
 yarn run build
 ```
 
+### Using Local Development Version of `@rabbiagency/react-sortable-tree`
+
+If you intend to use a local version of for development purposes, follow these steps to avoid React hook issues (caused by multiple React instances): `@rabbiagency/react-sortable-tree`
+1. **Link the Local Package**
+   In the project directory, link the package via `yarn link`: `@rabbiagency/react-sortable-tree`
+``` bash
+   cd /<path>/react-sortable-tree
+   yarn link
+```
+Then, in the main project directory, link this local dependency:
+``` bash
+   yarn link "@rabbiagency/react-sortable-tree"
+```
+1. **Link `react` and Across Projects`react-dom`**
+   To prevent multiple instances of React, link `react` and from the main project to the local dependency: `react-dom`
+   From the main project, run:
+``` bash
+   cd node_modules/react
+   yarn link
+   cd ../react-dom
+   yarn link
+```
+Then, in the project directory, link these modules: `@rabbiagency/react-sortable-tree`
+``` bash
+   cd /<path>/react-sortable-tree
+   yarn link react
+   yarn link react-dom
+```
+1. **Unlink the Local Package If Needed**
+   To revert to using the published version of the package, unlink the local dependency and reinstall:
+``` bash
+   yarn unlink "@rabbiagency/react-sortable-tree"
+   yarn install
+```
+1. **Peer Dependencies Recommendation**
+   Ensure that React and ReactDOM are defined as peer dependencies in the package to avoid conflicts. `@rabbiagency/react-sortable-tree`
+
+
+
 Pull requests are welcome!
 
 ## License
