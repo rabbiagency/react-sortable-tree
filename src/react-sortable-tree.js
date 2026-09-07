@@ -213,6 +213,7 @@ class ReactSortableTree extends Component {
   }
 
   componentWillUnmount() {
+    this.dndManager.cancelAutoExpand();
     this.clearMonitorSubscription();
   }
 
@@ -226,6 +227,9 @@ class ReactSortableTree extends Component {
 
   handleDndMonitorChange() {
     const monitor = this.props.dragDropManager.getMonitor();
+    if (!monitor.isDragging()) {
+      this.dndManager.cancelAutoExpand();
+    }
     // If the drag ends and the tree is still in a mid-drag state,
     // it means that the drag was canceled or the dragSource dropped
     // elsewhere, and we should reset the state of this tree
@@ -426,7 +430,26 @@ class ReactSortableTree extends Component {
     });
   }
 
+  getDragHoverExpansionCandidate({ node, depth, minimumTreeIndex }) {
+    const { draggingTreeData, instanceProps } = this.state;
+    const addedResult = memoizedInsertNode({
+      treeData: draggingTreeData || instanceProps.treeData,
+      newNode: node,
+      depth,
+      minimumTreeIndex,
+      expandParent: false,
+      getNodeKey: this.props.getNodeKey,
+    });
+
+    if (!addedResult.parentNode || addedResult.parentNode.expanded) {
+      return null;
+    }
+
+    return addedResult.path.slice(0, -1);
+  }
+
   endDrag(dropResult) {
+    this.dndManager.cancelAutoExpand();
     const { instanceProps } = this.state;
 
     const resetTree = () =>
@@ -897,6 +920,9 @@ ReactSortableTree.propTypes = {
   // Called to track between dropped and dragging
   onDragStateChanged: PropTypes.func,
 
+  // Delay before a collapsed drag-hover parent expands, in milliseconds.
+  autoExpandOnHoverDelay: PropTypes.number,
+
   // Specify that nodes that do not match search will be collapsed
   onlyExpandSearchedNodes: PropTypes.bool,
 
@@ -932,6 +958,7 @@ ReactSortableTree.defaultProps = {
   style: {},
   theme: {},
   onDragStateChanged: () => {},
+  autoExpandOnHoverDelay: 0,
   onlyExpandSearchedNodes: false,
   rowDirection: 'ltr',
 };

@@ -48,6 +48,59 @@ export default class DndManager {
     return this.treeRef.props.maxDepth;
   }
 
+  get autoExpandOnHoverDelay() {
+    return this.treeRef.props.autoExpandOnHoverDelay;
+  }
+
+  cancelAutoExpand() {
+    clearTimeout(this.autoExpandTimer);
+    this.autoExpandTimer = null;
+    this.autoExpandCandidate = null;
+  }
+
+  handleHover(params, monitor) {
+    const canDrop = monitor.canDrop();
+    if (
+      !this.autoExpandOnHoverDelay ||
+      !canDrop ||
+      !this.treeRef.getDragHoverExpansionCandidate
+    ) {
+      this.cancelAutoExpand();
+      if (canDrop) {
+        this.dragHover(params);
+      }
+      return;
+    }
+
+    const candidate = this.treeRef.getDragHoverExpansionCandidate(params);
+    if (!candidate) {
+      this.cancelAutoExpand();
+      this.dragHover(params);
+      return;
+    }
+
+    const candidateKey = JSON.stringify(candidate);
+    if (candidateKey === this.autoExpandCandidate) {
+      return;
+    }
+
+    this.cancelAutoExpand();
+    this.autoExpandCandidate = candidateKey;
+    this.autoExpandTimer = setTimeout(() => {
+      if (this.autoExpandCandidate !== candidateKey) {
+        return;
+      }
+
+      this.autoExpandCandidate = null;
+      this.autoExpandTimer = null;
+      if (!monitor.getItem() || !monitor.isOver()) {
+        return;
+      }
+
+      this.dragHover(params);
+    }, this.autoExpandOnHoverDelay);
+  }
+
   getTargetDepth(dropTargetProps, monitor, component) {
     let dropTargetDepth = 0;
 
@@ -201,6 +254,7 @@ export default class DndManager {
   wrapTarget(el) {
     const nodeDropTarget = {
       drop: (dropTargetProps, monitor, component) => {
+        this.cancelAutoExpand();
         const result = {
           node: monitor.getItem().node,
           path: monitor.getItem().path,
@@ -240,12 +294,15 @@ export default class DndManager {
           if (!item || !monitor.isOver()) {
             return;
           }
-          this.dragHover({
-            node: draggedNode,
-            path: item.path,
-            minimumTreeIndex: dropTargetProps.listIndex,
-            depth: targetDepth,
-          });
+          this.handleHover(
+            {
+              node: draggedNode,
+              path: item.path,
+              minimumTreeIndex: dropTargetProps.listIndex,
+              depth: targetDepth,
+            },
+            monitor
+          );
         });
       },
 

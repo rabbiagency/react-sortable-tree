@@ -13,6 +13,118 @@ import SortableTree, {
 } from './react-sortable-tree';
 import TreeNode from './tree-node';
 import DefaultNodeRenderer from './node-renderer-default';
+import DndManager from './utils/dnd-manager';
+
+describe('drag hover auto-expand', () => {
+  const params = {
+    node: { title: 'dragged' },
+    path: [0],
+    minimumTreeIndex: 1,
+    depth: 1,
+  };
+  const monitor = {
+    canDrop: () => true,
+    getItem: () => params.node,
+    isOver: () => true,
+  };
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('expands a collapsed hover parent after the configured delay', () => {
+    const dragHover = jest.fn();
+    const manager = new DndManager({
+      dragHover,
+      getDragHoverExpansionCandidate: () => [0],
+      props: { autoExpandOnHoverDelay: 500 },
+    });
+
+    manager.handleHover(params, monitor);
+    jest.advanceTimersByTime(499);
+    expect(dragHover).not.toHaveBeenCalled();
+
+    jest.advanceTimersByTime(1);
+    expect(dragHover).toHaveBeenCalledWith(params);
+  });
+
+  it('does not restart the delay while hovering the same parent', () => {
+    const dragHover = jest.fn();
+    const manager = new DndManager({
+      dragHover,
+      getDragHoverExpansionCandidate: () => [0],
+      props: { autoExpandOnHoverDelay: 500 },
+    });
+
+    manager.handleHover(params, monitor);
+    jest.advanceTimersByTime(400);
+    manager.handleHover(params, monitor);
+    jest.advanceTimersByTime(100);
+
+    expect(dragHover).toHaveBeenCalledTimes(1);
+  });
+
+  it('restarts the delay when the hover parent changes', () => {
+    const dragHover = jest.fn();
+    const manager = new DndManager({
+      dragHover,
+      getDragHoverExpansionCandidate: ({ minimumTreeIndex }) => [
+        minimumTreeIndex,
+      ],
+      props: { autoExpandOnHoverDelay: 500 },
+    });
+
+    manager.handleHover(params, monitor);
+    jest.advanceTimersByTime(400);
+    const nextParams = { ...params, minimumTreeIndex: 2 };
+    manager.handleHover(nextParams, monitor);
+    jest.advanceTimersByTime(100);
+    expect(dragHover).not.toHaveBeenCalled();
+
+    jest.advanceTimersByTime(400);
+    expect(dragHover).toHaveBeenCalledWith(nextParams);
+  });
+
+  it('keeps immediate hover updates when no collapsed parent is targeted', () => {
+    const dragHover = jest.fn();
+    const manager = new DndManager({
+      dragHover,
+      getDragHoverExpansionCandidate: () => null,
+      props: { autoExpandOnHoverDelay: 500 },
+    });
+
+    manager.handleHover(params, monitor);
+
+    expect(dragHover).toHaveBeenCalledWith(params);
+  });
+
+  it('allows the same parent to be targeted after an expired hover', () => {
+    let isOver = false;
+    const dragHover = jest.fn();
+    const manager = new DndManager({
+      dragHover,
+      getDragHoverExpansionCandidate: () => [0],
+      props: { autoExpandOnHoverDelay: 500 },
+    });
+    const changingMonitor = {
+      ...monitor,
+      isOver: () => isOver,
+    };
+
+    manager.handleHover(params, changingMonitor);
+    jest.advanceTimersByTime(500);
+    expect(dragHover).not.toHaveBeenCalled();
+
+    isOver = true;
+    manager.handleHover(params, changingMonitor);
+    jest.advanceTimersByTime(500);
+    expect(dragHover).toHaveBeenCalledWith(params);
+  });
+});
 
 describe('<SortableTree />', () => {
   it('should render tree correctly', () => {
@@ -472,5 +584,29 @@ describe('<SortableTree />', () => {
       draggedNode: null,
     });
     expect(onDragStateChanged).toHaveBeenCalledTimes(2);
+  });
+
+  it('identifies a collapsed drag-hover parent as an expansion candidate', () => {
+    const wrapper = mount(
+      <SortableTree
+        treeData={[
+          {
+            title: 'parent',
+            expanded: false,
+            children: [{ title: 'child' }],
+          },
+        ]}
+        onChange={() => {}}
+      />
+    );
+    const tree = wrapper.find('ReactSortableTree').instance();
+
+    expect(
+      tree.getDragHoverExpansionCandidate({
+        node: { title: 'dragged' },
+        depth: 1,
+        minimumTreeIndex: 1,
+      })
+    ).toEqual([0]);
   });
 });
