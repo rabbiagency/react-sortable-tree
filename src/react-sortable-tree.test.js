@@ -38,17 +38,21 @@ describe('drag hover auto-expand', () => {
 
   it('expands a collapsed hover parent after the configured delay', () => {
     const dragHover = jest.fn();
+    const setAutoExpandCandidate = jest.fn();
     const manager = new DndManager({
       dragHover,
       getDragHoverExpansionCandidate: () => [0],
+      setAutoExpandCandidate,
       props: { autoExpandOnHoverDelay: 500 },
     });
 
     manager.handleHover(params, monitor);
+    expect(setAutoExpandCandidate).toHaveBeenCalledWith([0]);
     jest.advanceTimersByTime(499);
     expect(dragHover).not.toHaveBeenCalled();
 
     jest.advanceTimersByTime(1);
+    expect(setAutoExpandCandidate).toHaveBeenLastCalledWith(null);
     expect(dragHover).toHaveBeenCalledWith(params);
   });
 
@@ -57,6 +61,7 @@ describe('drag hover auto-expand', () => {
     const manager = new DndManager({
       dragHover,
       getDragHoverExpansionCandidate: () => [0],
+      setAutoExpandCandidate: jest.fn(),
       props: { autoExpandOnHoverDelay: 500 },
     });
 
@@ -75,6 +80,7 @@ describe('drag hover auto-expand', () => {
       getDragHoverExpansionCandidate: ({ minimumTreeIndex }) => [
         minimumTreeIndex,
       ],
+      setAutoExpandCandidate: jest.fn(),
       props: { autoExpandOnHoverDelay: 500 },
     });
 
@@ -94,6 +100,7 @@ describe('drag hover auto-expand', () => {
     const manager = new DndManager({
       dragHover,
       getDragHoverExpansionCandidate: () => null,
+      setAutoExpandCandidate: jest.fn(),
       props: { autoExpandOnHoverDelay: 500 },
     });
 
@@ -108,6 +115,7 @@ describe('drag hover auto-expand', () => {
     const manager = new DndManager({
       dragHover,
       getDragHoverExpansionCandidate: () => [0],
+      setAutoExpandCandidate: jest.fn(),
       props: { autoExpandOnHoverDelay: 500 },
     });
     const changingMonitor = {
@@ -123,6 +131,25 @@ describe('drag hover auto-expand', () => {
     manager.handleHover(params, changingMonitor);
     jest.advanceTimersByTime(500);
     expect(dragHover).toHaveBeenCalledWith(params);
+  });
+
+  it('cancels pending expansion when its hover target is left', () => {
+    const dragHover = jest.fn();
+    const setAutoExpandCandidate = jest.fn();
+    const manager = new DndManager({
+      dragHover,
+      getDragHoverExpansionCandidate: () => [0],
+      setAutoExpandCandidate,
+      props: { autoExpandOnHoverDelay: 500 },
+    });
+    const hoverParams = { ...params, hoverTargetPath: [1] };
+
+    manager.handleHover(hoverParams, monitor);
+    manager.handleTargetLeave([1]);
+    jest.advanceTimersByTime(500);
+
+    expect(setAutoExpandCandidate).toHaveBeenLastCalledWith(null);
+    expect(dragHover).not.toHaveBeenCalled();
   });
 });
 
@@ -608,5 +635,30 @@ describe('<SortableTree />', () => {
         minimumTreeIndex: 1,
       })
     ).toEqual([0]);
+  });
+
+  it('marks only the auto-expand candidate row as pending', () => {
+    const NodeContentRenderer = ({ className }) => (
+      <div className={className || 'idle'} />
+    );
+    const wrapper = mount(
+      <SortableTree
+        treeData={[
+          {
+            title: 'parent',
+            expanded: false,
+            children: [{ title: 'child' }],
+          },
+        ]}
+        nodeContentRenderer={NodeContentRenderer}
+        onChange={() => {}}
+      />
+    );
+    const tree = wrapper.find('ReactSortableTree').instance();
+
+    tree.setAutoExpandCandidate([0]);
+    wrapper.update();
+
+    expect(wrapper.find('div.rst__rowAutoExpandPending')).toHaveLength(1);
   });
 });

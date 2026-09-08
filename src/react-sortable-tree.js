@@ -111,6 +111,7 @@ class ReactSortableTree extends Component {
       draggedNode: null,
       draggedMinimumTreeIndex: null,
       draggedDepth: null,
+      autoExpandCandidate: null,
       searchMatches: [],
       searchFocusTreeIndex: null,
       dragging: false,
@@ -130,6 +131,7 @@ class ReactSortableTree extends Component {
     this.dragHover = this.dragHover.bind(this);
     this.endDrag = this.endDrag.bind(this);
     this.drop = this.drop.bind(this);
+    this.setAutoExpandCandidate = this.setAutoExpandCandidate.bind(this);
     this.handleDndMonitorChange = this.handleDndMonitorChange.bind(this);
   }
 
@@ -213,7 +215,7 @@ class ReactSortableTree extends Component {
   }
 
   componentWillUnmount() {
-    this.dndManager.cancelAutoExpand();
+    this.dndManager.cancelAutoExpand(false);
     this.clearMonitorSubscription();
   }
 
@@ -448,6 +450,10 @@ class ReactSortableTree extends Component {
     return addedResult.path.slice(0, -1);
   }
 
+  setAutoExpandCandidate(autoExpandCandidate) {
+    this.setState({ autoExpandCandidate });
+  }
+
   endDrag(dropResult) {
     this.dndManager.cancelAutoExpand();
     const { instanceProps } = this.state;
@@ -626,6 +632,14 @@ class ReactSortableTree extends Component {
           toggleChildrenVisibility={this.toggleChildrenVisibility}
           {...sharedProps}
           {...nodeProps}
+          {...(isEqual(this.state.autoExpandCandidate, path)
+            ? {
+                className: classnames(
+                  nodeProps.className,
+                  'rst__rowAutoExpandPending'
+                ),
+              }
+            : {})}
         />
       </TreeNodeRenderer>
     );

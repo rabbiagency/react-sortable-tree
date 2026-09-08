@@ -2,10 +2,12 @@ import { DragSource as dragSource, DropTarget as dropTarget } from 'react-dnd';
 import { findDOMNode } from 'react-dom';
 import { getDepth } from './tree-data-utils';
 import { memoizedInsertNode } from './memoized-tree-data-utils';
+import createTreeNodeDropTarget from './tree-node-drop-target';
 
 export default class DndManager {
   constructor(treeRef) {
     this.treeRef = treeRef;
+    this.handleTargetLeave = this.handleTargetLeave.bind(this);
   }
 
   get startDrag() {
@@ -52,10 +54,21 @@ export default class DndManager {
     return this.treeRef.props.autoExpandOnHoverDelay;
   }
 
-  cancelAutoExpand() {
+  cancelAutoExpand(notify = true) {
+    const hadCandidate = this.autoExpandCandidate != null;
     clearTimeout(this.autoExpandTimer);
     this.autoExpandTimer = null;
     this.autoExpandCandidate = null;
+    this.autoExpandHoverTarget = null;
+    if (hadCandidate && notify) {
+      this.treeRef.setAutoExpandCandidate(null);
+    }
+  }
+
+  handleTargetLeave(path) {
+    if (JSON.stringify(path) === this.autoExpandHoverTarget) {
+      this.cancelAutoExpand();
+    }
   }
 
   handleHover(params, monitor) {
@@ -84,15 +97,19 @@ export default class DndManager {
       return;
     }
 
-    this.cancelAutoExpand();
+    this.cancelAutoExpand(false);
     this.autoExpandCandidate = candidateKey;
+    this.autoExpandHoverTarget = JSON.stringify(params.hoverTargetPath);
+    this.treeRef.setAutoExpandCandidate(candidate);
     this.autoExpandTimer = setTimeout(() => {
       if (this.autoExpandCandidate !== candidateKey) {
         return;
       }
 
       this.autoExpandCandidate = null;
+      this.autoExpandHoverTarget = null;
       this.autoExpandTimer = null;
+      this.treeRef.setAutoExpandCandidate(null);
       if (!monitor.getItem() || !monitor.isOver()) {
         return;
       }
@@ -252,6 +269,11 @@ export default class DndManager {
   }
 
   wrapTarget(el) {
+    const TreeNodeDropTarget = createTreeNodeDropTarget(
+      el,
+      this.handleTargetLeave
+    );
+
     const nodeDropTarget = {
       drop: (dropTargetProps, monitor, component) => {
         this.cancelAutoExpand();
@@ -298,6 +320,7 @@ export default class DndManager {
             {
               node: draggedNode,
               path: item.path,
+              hoverTargetPath: dropTargetProps.path,
               minimumTreeIndex: dropTargetProps.listIndex,
               depth: targetDepth,
             },
@@ -323,7 +346,7 @@ export default class DndManager {
       this.dndType,
       nodeDropTarget,
       nodeDropTargetPropInjection
-    )(el);
+    )(TreeNodeDropTarget);
   }
 
   wrapPlaceholder(el) {
