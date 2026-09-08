@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [2.11.0](https://github.com/rabbiagency/react-sortable-tree/compare/v2.10.0...v2.11.0) (2026-09-08)
+
+
+### Features
+
+* indicate pending drag-hover expansion ([b2b8c8c](https://github.com/rabbiagency/react-sortable-tree/commit/b2b8c8c0248658d843f9f6012392f69d7a9d17cf))
+
 ## 2.10.0 (2026-09-07)
 
 ### Features
